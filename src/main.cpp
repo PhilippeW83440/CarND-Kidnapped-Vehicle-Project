@@ -4,6 +4,9 @@
 #include <math.h>
 #include "particle_filter.h"
 
+// pwe
+bool is_unitary_tests = true;
+
 using namespace std;
 
 // for convenience
@@ -45,6 +48,18 @@ int main()
 
   // Create particle filter
   ParticleFilter pf;
+
+  if (is_unitary_tests) {
+    if (!pf.initialized()) {
+		  pf.init(5.0, 10.0, M_PI, sigma_pos);
+    }
+    double meas_velocity = 10.0;
+    double meas_yawrate = 0; //M_PI;
+
+		pf.prediction(delta_t, sigma_pos, meas_velocity, meas_yawrate);
+	  cout << "End of unitary tests" << endl;
+    return 0;
+  }
 
   h.onMessage([&pf,&map,&delta_t,&sensor_range,&sigma_pos,&sigma_landmark](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
