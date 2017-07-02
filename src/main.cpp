@@ -5,7 +5,7 @@
 #include "particle_filter.h"
 
 // pwe
-bool is_unitary_tests = true;
+bool is_unitary_tests = false;
 
 using namespace std;
 

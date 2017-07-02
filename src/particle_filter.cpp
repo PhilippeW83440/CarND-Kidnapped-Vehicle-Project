@@ -22,6 +22,9 @@
 
 using namespace std;
 
+default_random_engine gen;
+normal_distribution<double> distn(0, 1); // normal distribution
+
 
 double normpdfxy(double x, double y, double mu_x, double mu_y, double std_x, double std_y) {
   double cx = (x - mu_x) / std_x;
@@ -40,20 +43,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
   cout << "Init: x, y, theta = " << x << ", " << y << ", " << theta << endl;
 
-  num_particles = 1;
+  num_particles = 100;
   Particle particle;
-
-	// Create normal (Gaussian) distributions for x, y, theta based on GPS sensor noise
-	normal_distribution<double> dist_x(x, std[0]);
-	normal_distribution<double> dist_y(y, std[1]);
-	normal_distribution<double> dist_theta(theta, std[2]);
-  default_random_engine gen;
 
   for (int i = 0; i < num_particles; i++) {
     particle.id = i + 1;
-    particle.x = dist_x(gen);
-    particle.y = dist_y(gen);
-    particle.theta = dist_theta(gen);
+    particle.x = x + std[0] * distn(gen);
+    particle.y = y + std[1] * distn(gen);
+    particle.theta = theta + std[2] * distn(gen);
     particle.weight = 1.0;
 		cout << "Particle: " << particle.id << " " << particle.x << " " << particle.y << " " << particle.theta << endl;
     weights.push_back(1.0);
@@ -72,9 +69,10 @@ void ParticleFilter::prediction(double dt, double std_pos[], double velocity, do
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+#ifdef DEBUG
   cout << "Prediction: dt, velocity, yaw_rate = " << dt << ", " << velocity << ", " << yaw_rate << endl;
+#endif
 
-  default_random_engine gen;
   double x_new, y_new, theta_new;
 
   for (int i = 0; i < particles.size(); i++) {
@@ -96,15 +94,14 @@ void ParticleFilter::prediction(double dt, double std_pos[], double velocity, do
     }
 
     // take sensor noise into account
-	  normal_distribution<double> dist_x(x_new, std_pos[0]);
-	  normal_distribution<double> dist_y(y_new, std_pos[1]);
-	  normal_distribution<double> dist_theta(theta_new, std_pos[2]);
-    particles[i].x = dist_x(gen);
-    particles[i].y = dist_y(gen);
-    particles[i].theta = dist_theta(gen);
+    particles[i].x = x_new + std_pos[0] * distn(gen);
+    particles[i].y = y_new + std_pos[1] * distn(gen);
+    particles[i].theta = theta_new + std_pos[2] * distn(gen);
 
+#ifdef DEBUG
 		cout << "Prediction Particle: " << particles[i].id << " " << particles[i].x \
          << " " << particles[i].y << " " << particles[i].theta << endl;
+#endif
   }
 
 }
@@ -129,15 +126,13 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     // already converted from local to map coordinate system
     double x_obs = observations[i].x;
     double y_obs = observations[i].y;
-    observations[i].id = -1; // Id of matching landmark in the map
 
+    observations[i].id = -1; // Id of matching landmark in the map
     min_dist = 1e10;
+
     for (int j = 0; j < predicted.size(); j++) {
       // in map coordinate system
-      double x_lmark = predicted[j].x;
-      double y_lmark = predicted[j].y;
-
-      new_dist = dist(x_obs, y_obs, x_lmark, y_lmark);
+      new_dist = dist(x_obs, y_obs, predicted[j].x, predicted[j].y);
       if (new_dist < min_dist) {
         min_dist = new_dist;
 
@@ -146,7 +141,9 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
         observations[i].id = j; // Index of matching landmark in the predicted_map
       }
     }
+#ifdef DEBUG
     cout << "Association OBS " << i+1 << " with LM " << observations[i].id+1 << endl;
+#endif
   }
 
 }
@@ -201,7 +198,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       double xobs_loc = observations[j].x;
       double yobs_loc = observations[j].y;
 
+#ifdef DEBUG
       cout << "xobs(" << j+1 << ") loc: x, y = " << xobs_loc << ", " << yobs_loc << endl;
+#endif
 
       // observations in global map coord system
       observation.x = cos(theta_part) * xobs_loc - sin(theta_part) * yobs_loc + x_part;
@@ -209,7 +208,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       observation.id = observations[j].id;
       observations_map.push_back(observation);
 
+#ifdef DEBUG
       cout << "xobs(" << j+1 << ") map: x, y = " << observation.x << ", " << observation.y << endl;
+#endif
     }
 
     //--------------------------------------------------------------------------------------
@@ -230,11 +231,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       double mu_y = predicted_map[ observations_map[j].id ].y;
 
       double wobs = normpdfxy(x, y, mu_x, mu_y, std_landmark[0], std_landmark[1]);
+#ifdef DEBUG
       cout << "wobs: " << wobs << endl;
+#endif
       particles[i].weight *= wobs;
     }
     weights[i] = particles[i].weight;
+#ifdef DEBUG
     cout << "Weight" << i+1 << " = " << weights[i] << endl;
+#endif
     weight_sum += particles[i].weight; // for later on weight normalization
 
     observations_map.clear(); // clear obs for that particle in global map coord system
@@ -261,7 +266,6 @@ void ParticleFilter::resample() {
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
 	std::vector<Particle> new_particles;
-  default_random_engine gen;
 
 	//uniform_real_distribution<double> dist_u(0.0, 1.0);
 
@@ -279,6 +283,7 @@ void ParticleFilter::resample() {
   //}
 
   discrete_distribution<> distrib(weights.begin(), weights.end());
+
   for (int i = 0; i < num_particles; i++) {
     new_particles.push_back(particles[ distrib(gen) ]);
   }
