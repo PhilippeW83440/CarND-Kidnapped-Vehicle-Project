@@ -12,6 +12,62 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
+
+
+// unitary test corresponding to L14.13 quizz
+void unitary_tests() {
+  ParticleFilter pf;
+
+  //Set up parameters here
+  double sensor_range = 50; // Sensor range [m]
+
+  //double delta_t = 0.1; // Time elapsed between measurements [sec]
+  //double sigma_pos [3] = {0.3, 0.3, 0.01}; // GPS measurement uncertainty [x [m], y [m], theta [rad]]
+  //double sigma_landmark [2] = {0.3, 0.3}; // Landmark measurement uncertainty [x [m], y [m]]
+
+  double delta_t = 0.0; // Time elapsed between measurements [sec]
+  double sigma_pos [3] = {0.0, 0.0, 0.0}; // GPS measurement uncertainty [x [m], y [m], theta [rad]]
+  double sigma_landmark [2] = {0.3, 0.3}; // Landmark measurement uncertainty [x [m], y [m]]
+
+  # define NOBS 3
+  double obs_x[NOBS] = { 2.0,  3.0,  0.0};
+  double obs_y[NOBS] = { 2.0, -2.0, -4.0};
+
+  # define NLMARK 5
+  double lmark_x[NLMARK] = { 5.0, 2.0, 6.0, 7.0, 4.0};
+  double lmark_y[NLMARK] = { 3.0, 1.0, 1.0, 4.0, 7.0};
+
+  if (!pf.initialized()) {
+	  pf.init(4.0, 5.0, -M_PI/2, sigma_pos);
+  }
+  double meas_velocity = 0.1;
+  double meas_yawrate = 0.01; //M_PI;
+
+	pf.prediction(delta_t, sigma_pos, meas_velocity, meas_yawrate);
+
+	vector<LandmarkObs> noisy_observations(3);
+  for (int i = 0; i < NOBS; i++) {
+    noisy_observations[i].x = obs_x[i];
+    noisy_observations[i].y = obs_y[i];
+  }
+
+  Map small_map;
+	small_map.landmark_list.resize(5);
+  for (int i = 0; i < NLMARK; i++) {
+    small_map.landmark_list[i].x_f = lmark_x[i];
+    small_map.landmark_list[i].y_f = lmark_y[i];
+	  small_map.landmark_list[i].id_i = i + 1;
+  }
+
+  pf.updateWeights(sensor_range, sigma_landmark, noisy_observations, small_map);
+  pf.resample();
+
+  cout << "End of unitary tests" << endl;
+}
+
+
+
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -30,6 +86,12 @@ std::string hasData(std::string s) {
 
 int main()
 {
+
+  if (is_unitary_tests){
+    unitary_tests();
+    return 0;
+  }
+
   uWS::Hub h;
 
   //Set up parameters here
@@ -48,18 +110,6 @@ int main()
 
   // Create particle filter
   ParticleFilter pf;
-
-  if (is_unitary_tests) {
-    if (!pf.initialized()) {
-		  pf.init(5.0, 10.0, M_PI, sigma_pos);
-    }
-    double meas_velocity = 10.0;
-    double meas_yawrate = 0; //M_PI;
-
-		pf.prediction(delta_t, sigma_pos, meas_velocity, meas_yawrate);
-	  cout << "End of unitary tests" << endl;
-    return 0;
-  }
 
   h.onMessage([&pf,&map,&delta_t,&sensor_range,&sigma_pos,&sigma_landmark](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.

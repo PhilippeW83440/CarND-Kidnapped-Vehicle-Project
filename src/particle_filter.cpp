@@ -40,7 +40,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
   cout << "Init: x, y, theta = " << x << ", " << y << ", " << theta << endl;
 
-  num_particles = 5;
+  num_particles = 1;
   Particle particle;
 
 	// Create normal (Gaussian) distributions for x, y, theta based on GPS sensor noise
@@ -142,12 +142,11 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
         min_dist = new_dist;
 
         //observations[i].id = predicted[j].id; // Id of matching landmark in the map
-
         // FASTER: for direct access
         observations[i].id = j; // Index of matching landmark in the predicted_map
       }
     }
-
+    cout << "Association OBS " << i+1 << " with LM " << observations[i].id+1 << endl;
   }
 
 }
@@ -168,7 +167,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   double weight_sum = 0.0;
 
   for (int i = 0; i < particles.size(); i++) {
-    std::vector<LandmarkObs> predicted_map;
 
     double x_part = particles[i].x;
     double y_part = particles[i].y;
@@ -177,6 +175,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     //---------------------------------------------------------------------------------------
     // 1) predict measurements to all the map landmarks within sensor range for each particle
     //---------------------------------------------------------------------------------------
+    std::vector<LandmarkObs> predicted_map;
 
     for (int j = 0; j < map_landmarks.landmark_list.size(); j++) {
       double x_lmark = map_landmarks.landmark_list[j].x_f;
@@ -202,20 +201,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       double xobs_loc = observations[j].x;
       double yobs_loc = observations[j].y;
 
+      cout << "xobs(" << j+1 << ") loc: x, y = " << xobs_loc << ", " << yobs_loc << endl;
+
       // observations in global map coord system
       observation.x = cos(theta_part) * xobs_loc - sin(theta_part) * yobs_loc + x_part;
       observation.y = sin(theta_part) * xobs_loc + cos(theta_part) * yobs_loc + y_part;
       observation.id = observations[j].id;
       observations_map.push_back(observation);
+
+      cout << "xobs(" << j+1 << ") map: x, y = " << observation.x << ", " << observation.y << endl;
     }
 
     //--------------------------------------------------------------------------------------
     // 3) dataAssociation
     //--------------------------------------------------------------------------------------
     dataAssociation(predicted_map, observations_map);
-
-    observations_map.clear(); // clear obs for that particle in global map coord system
-    predicted_map.clear();
 
     //---------------------------------------------------------------------------------------
     // 4) Compute weight for this particule 
@@ -233,17 +233,25 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       cout << "wobs: " << wobs << endl;
       particles[i].weight *= wobs;
     }
-
+    weights[i] = particles[i].weight;
+    cout << "Weight" << i+1 << " = " << weights[i] << endl;
     weight_sum += particles[i].weight; // for later on weight normalization
+
+    observations_map.clear(); // clear obs for that particle in global map coord system
+    predicted_map.clear();
   } // end for particles
 
   //---------------------------------------------------------------------------------------
   // 5) Normalize weights
   //---------------------------------------------------------------------------------------
-  for (int i = 0; i < particles.size(); i++) {
-    particles[i].weight /= weight_sum;
-    weights[i] = particles[i].weight;
-  }
+
+  // useless when using discrete_distribution when resampling
+  // handled by discrete_distribution automatically
+
+  //for (int i = 0; i < particles.size(); i++) {
+  //  particles[i].weight /= weight_sum;
+  //  weights[i] = particles[i].weight;
+  //}
 
 }
 
